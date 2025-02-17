@@ -3,7 +3,7 @@ title: "Split-plot RCBD"
 format: html
 ---
 
-# Introduction  
+# Introduction  - Test from new lab desktop
 The goals of this exercise are to:  
 - Create an analytical workflow for a **split-plot RCBD** with **random blocks**, from data import through publication-ready plot  
 - Understand each of its components  
