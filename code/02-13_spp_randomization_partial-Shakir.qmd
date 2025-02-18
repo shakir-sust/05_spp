@@ -78,18 +78,22 @@ sp_rcbd_rand  <- crossing(nrate_kgha = c(0,100,200), #c(0,100, 200) to indicate 
 sp_rcbd_rand
 ```
 
-## Joining WP and SP into one object
+## Joining WP and SP into one object  
+
 ```{r spp_rcbd_rand}
 spp_rcbd_rand <- wp_rcbd_rand %>%
-  right_join(sp_rcbd_rand) %>% #We want to have 36 rows, not only 12. Because of that, we are gonna use "right_join()" instead of "left_join()". For "left_join()", it looks on the data set on the left of the pipe (spp_rcbd_rand <- wp_rcbd_rand), and then looks on the right side of the pipe (sp_rcbd_rand), then join them with the frame on the left of the pipe. So, if the data frame on the left starts with 12 rows, the combined data frame will have 12 rows. For "right_join()", it's the opposite. In this case, we are using the data frame which has 36 rows as our basis to merge. That's why we are using "right_join()"
-  mutate(trtname = paste0(krate_kgha, "+", nrate_kgha)) #to create a new column "trtname" in the dataset, which indicates the combination of "krate_kgha" and "nrate_kgha"
+  right_join(sp_rcbd_rand) %>% #We want to have 36 rows, not only 12. Because of that, we are gonna use "right_join()" instead of "left_join()". For "left_join()", it looks on the data set on the left of the pipe (spp_rcbd_rand <- wp_rcbd_rand), and then looks on the right side of the pipe (sp_rcbd_rand), then join them with the frame on the left of the pipe. So, if the data frame on the left starts with 12 rows, the combined data frame will have 12 rows. For "right_join()", it's the opposite. In this case, we are using the data frame which has 36 rows as our basis to merge. That's why we are using "right_join()" which will result in a merged data frame with 36 rows.
+  mutate(trtname = paste0(krate_kgha, "+", nrate_kgha)) #to create a new column "trtname" in the dataset, which indicates the combination of "krate_kgha" and "prate_kgha"
 
 spp_rcbd_rand
 ```
 
 How many rows in the object above? Why?
 
+Answer: There are 36 rows in the merged data frame because we used "right_join()" instead of "left_join()".
+
 Let's inspect block 1.  
+
 ```{r}
 spp_rcbd_rand  %>%
   filter(block == 1) #In the output, we have 9 rows because we have 9 split plot experimental units, with only 3 whole plot experimental units. This filtering is done to check that there is only 1 level of potassium (for example, 60) within each block for all 3 whole plots (e.g., 101, 102, 103) with all 3 levels of nitrogen rate in the same block
@@ -105,7 +109,7 @@ spp_rcbd_layout <- spp_rcbd_rand %>%
   mutate(col = rep(seq(from = 1, 
                        to = 9, #total number of treatments, 
                        by = 1), 
-                   times = 4 #total number of blocks
+                   times = 4 #total number of blocks = 4
   )) %>%
   # Creating plot and trtname labels for plotting
   mutate(lab = paste0(splot, "\n", trtname))
