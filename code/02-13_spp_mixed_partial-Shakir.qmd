@@ -35,6 +35,8 @@ spp_rcbd_df
 ```
 
 # b) EDA tables  
+
+
 ```{r summary}
 summary(spp_rcbd_df)
 ```
@@ -42,10 +44,14 @@ summary(spp_rcbd_df)
 ```{r glimpse}
 glimpse(spp_rcbd_df)
 ```
-# c) Wrangling
+
+
+# c) Wrangling  
+
+
 ```{r rcbd_dfw}
 spp_rcbd_dfw <- spp_rcbd_df %>%
-  mutate(block = factor(block),
+  mutate(rep = factor(rep),
          nrate_kgha = factor(nrate_kgha),
          krate_kgha = factor(krate_kgha) 
          ) %>%
@@ -58,11 +64,11 @@ spp_rcbd_dfw
 ```{r rcbd_dfw}
 summary(spp_rcbd_dfw)
 ```
-Number of blocks: 4  
+Number of blocks (rep): 4  
 Number o treatments: 3 N rates x 3 K rates = 9  
 Number of observations: 4 x 9 = 36  
 Yield: from 2795 to 7445 kg/ha  
-
+  
 # d) EDA plots  
 ```{r n boxplot}
 ggplot(spp_rcbd_dfw, aes(x = nrate_kgha, 
@@ -106,10 +112,21 @@ We have 2 random variance component from the split-plot because we have 2 differ
 
 ```{r model}
 # Changing to sum-to-zero contrast
-options(contrasts = c("contr.sum", "contr.poly"))
+options(contrasts = c("contr.sum", "contr.poly")) # Does not have any effect on means, put has an effect on the ANOVA model and its p-value
 
 # Model fitting
-spp_rcbd_mix_mod 
+spp_rcbd_mix_mod <- lme4::lmer(yield_kgha ~ nrate_kgha*krate_kgha + 
+                                 (1|rep/krate_kgha), #To nest krate_kgha inside rep; we mention the  largest level of replication i.e., block, then the whole plot factor i.e., lower level random effect factor "krate_kgha" is followed by a forward slash (/)
+                               data = spp_rcbd_dfw)
+
+#For split-split plot design
+#spp_rcbd_mix_mod <- lme4::lmer(yield_kgha ~ nrate_kgha*krate_kgha*prate_kgha + 
+                                 #(1|rep/krate_kgha/nrate_kgha), #To nest krate_kgha inside rep; we mention the  largest level of replication i.e., block, then the whole plot factor i.e., lower level random effect factor "krate_kgha" is followed by a forward slash (/)
+                               #data = spp_rcbd_dfw)
+
+# (1|rep/krate_kgha) = (1|rep) + (1|krate_kgha)
+
+spp_rcbd_dfw
 
 # Summary
 summary(spp_rcbd_mix_mod)
@@ -124,11 +141,15 @@ Notice now how the `summary()` above has a new section for **random effects**, w
 ```{r ANOVA}
 Anova(spp_rcbd_mix_mod, type=3)
 ```
+
+
 Notice how this table is now titled "Analysis of Deviance Table". That's because we are using REML instead of mean squares.  
 
 Also notice how block (i.e., block in this case) does not appear in the ANOVA table above. That's because it only displays **fixed effects**.
 
 As before, since the interaction is significant here, we should extract means and perform pairwise comparisons for the interaction term.
+
+Very important note: We extract the means based on what effects are significant in the ANOVA table
 
 Before we do that, let's check our model assumptions. Remember, a model is only valid for inference (i.e., means and pwc) IF if fulfills the linear model assumptions.  
 
@@ -155,7 +176,7 @@ One difference in mixed models is that the 3 first assumptions are also applied 
 
 ### Block random effects are iid ~ N(0,var_a)  
 ```{r randeff_block}
-randeff_block
+randeff_block <- ranef(spp_rcbd_mix_mod)$rep #to output only the values for "rep"
 
 randeff_block
 ```
@@ -178,7 +199,10 @@ Nothing to worry here, especially since we only have 4 points.
 
 ### Block:krate random effects are iid ~ N(0,var_b)  
 ```{r randeff_block}
-randeff_blockkrate 
+
+#randeff_blockkrate <- ranef(spp_rcbd_mix_mod) #run this first to copy the `krate_kgha:rep` mentioned after the $ sign in the next line
+
+randeff_blockkrate <- ranef(spp_rcbd_mix_mod)$`krate_kgha:rep`
 
 randeff_blockkrate
 ```
@@ -211,9 +235,9 @@ ggplot(spp_rcbd_mix_resid, aes(x=.fitted, y=.studresid))+
   theme_bw()
 ```
 
-- **Independence**: seems liker there is a potential pattern, but since error bands comprise 0 on the y-axis, I'm not worried.  
+- **Independence**: seems like there is a potential pattern, but since error bands comprise 0 on the y-axis, I'm not worried.  
 
-- **Variance homoscedastic**: seems constant across the x-axis.   
+- **Variance homoscedastic**: seems constant across the x-axis. (i.e., no fin shape).
 
 - **Outliers**: nothing outside the -3,3 boundaries.  
 
@@ -230,6 +254,8 @@ ggplot(spp_rcbd_mix_resid, aes(sample=.studresid))+
        y = "Sample quantile")+
   theme_bw()
 ```
+QQ plot for the residual.
+
 
 ```{r}
 ggplot(spp_rcbd_mix_resid, aes(x=.studresid))+
@@ -241,7 +267,7 @@ ggplot(spp_rcbd_mix_resid, aes(x=.studresid))+
 
 ```
 
-- **Normality**: residuals seem normal.  
+- **Normality**: residuals seem normal (as per the density plot).  
 
 # h) Model means  
 The next step in the workflow is extracting the model means.  
@@ -249,12 +275,30 @@ The next step in the workflow is extracting the model means.
 Remember that it is at this level that we establish the hierarchy of how our pairwise comparisons will be performed.  
 
 Let's extract it by comparing everything to everything else.
+
 ```{r interaction means all}
 spp_rcbd_mix_means_all <- emmeans(spp_rcbd_mix_mod, 
                                   ~nrate_kgha:krate_kgha)
 
+spp_rcbd_mix_means_nrate <- emmeans(spp_rcbd_mix_mod, 
+                                  ~nrate_kgha)
+
+spp_rcbd_mix_means_krate <- emmeans(spp_rcbd_mix_mod, 
+                                  ~krate_kgha)
+
 spp_rcbd_mix_means_all
+
+spp_rcbd_mix_means_nrate
+
+spp_rcbd_mix_means_krate
+
 ```
+Note the following:
+
+For nrate_kgha:krate_kgha: SE = 330, df = 22.9
+For nrate_kgha,SE = 209, df = 8.19
+For krate_kgha, SE = 232, df = 8.28
+
 
 In a split-plot, we have 2 sources of error because we have 2 different sizes of EU that were randomized separately.  
 
@@ -264,20 +308,42 @@ What happens with the emmean error if we ask for the emmean of the main effects 
 
 ```{r k rate means}
 
+spp_rcbd_mix_means_krate <- emmeans(spp_rcbd_mix_mod, 
+                                  ~krate_kgha)
+
+spp_rcbd_mix_means_nrate
+
 ```
 The SE of the whole-plot treatment factor (k rate) is **232**.
+
+Note the following:
+
+For nrate_kgha:krate_kgha: SE = 330, df = 22.9
+For nrate_kgha,SE = 209, df = 8.19
+For krate_kgha, SE = 232, df = 8.28
 
 What about for the split-plot treatment factor (n rate)?  
 
 ```{r n rate means }
 
+spp_rcbd_mix_means_krate <- emmeans(spp_rcbd_mix_mod, 
+                                  ~krate_kgha)
+
+spp_rcbd_mix_means_krate
+
 ```
 It is 209.  
+
+Note the following:
+
+For nrate_kgha:krate_kgha: SE = 330, df = 22.9
+For nrate_kgha,SE = 209, df = 8.19
+For krate_kgha, SE = 232, df = 8.28
 
 Points to notice:  
   - The **SE of the WP and SP treatment factors is different**! On the RCBD case we ran last exercise, they were the same because we only had one experimental size unit.  
   
-  - The **SE of the SP treatment factor will always be lower than that from the WP treatment factor**. Why?  
+  - The **SE of the SP treatment factor will always be lower than that from the WP treatment factor**. Why?  Because how many - Listen 1:01:00
   
   - When comparing means from the interaction, the SE of those means is a combination of the SEs from both WP and SP errors.  
   
